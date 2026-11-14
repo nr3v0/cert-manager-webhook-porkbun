@@ -5,11 +5,11 @@
 #
 # No image is digest-pinned: rebuilds pick up the latest UBI 10 base images.
 #
-# Builder: UBI 10 Go Toolset, tracking the latest 1.27.x (floating tag, not
-# digest-pinned, so rebuilds pick up Go patch releases). It runs on the build
+# Builder: UBI 10 Go Toolset, tracking :latest (floating tag, not
+# digest-pinned, so rebuilds pick up new Go releases). It runs on the build
 # host's platform and cross-compiles, so multi-arch builds
 # (podman --platform) don't need emulation for the Go build.
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.27 AS build_deps
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:latest AS build_deps
 
 # Use the toolset's Go; don't let the go.mod `toolchain` line trigger a download.
 ENV GOTOOLCHAIN=local
