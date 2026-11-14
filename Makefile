@@ -18,7 +18,7 @@ KUSTOMIZE_FILES := $(shell find deploy/kustomize -type f)
 # Unit tests: no cluster, network or credentials needed.
 .PHONY: test
 test:
-	$(GO) test -v ./porkbun/ .
+	$(GO) test -v ./...
 
 # cert-manager DNS01 conformance suite against the real Porkbun API.
 # Needs TEST_ZONE_NAME and testdata/porkbun/{config.json,porkbun-credentials.yaml}.
@@ -38,6 +38,14 @@ clean:
 .PHONY: build
 build:
 	$(CONTAINER_TOOL) build -t "$(IMAGE_NAME):$(IMAGE_TAG)" .
+
+# Multi-arch build + push (podman). Requires `podman login quay.io`.
+PLATFORMS ?= linux/amd64,linux/arm64
+.PHONY: push
+push:
+	podman manifest rm "$(IMAGE_NAME):$(IMAGE_TAG)" 2>/dev/null || true
+	podman build --platform $(PLATFORMS) --manifest "$(IMAGE_NAME):$(IMAGE_TAG)" .
+	podman manifest push --all "$(IMAGE_NAME):$(IMAGE_TAG)" "docker://$(IMAGE_NAME):$(IMAGE_TAG)"
 
 $(OUT):
 	mkdir -p "$(OUT)"

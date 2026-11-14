@@ -28,12 +28,11 @@ challenges (needed, for example, for wildcard certificates) for domains hosted a
 | [`deploy/kustomize/base/`](deploy/kustomize/base/) | Plain Kubernetes manifests: ServiceAccount, RBAC, cert-manager PKI (self-signed CA and serving cert), Service, Deployment, APIService, and the `groupName` ConfigMap. |
 | [`deploy/kustomize/components/group-name/`](deploy/kustomize/components/group-name/) | A Kustomize component that copies `groupName` from the ConfigMap into the Deployment, APIService and RBAC. |
 | [`deploy/kustomize/overlays/openshift/`](deploy/kustomize/overlays/openshift/) | The overlay you deploy. It pins the image tag and is where you override `groupName`. |
-| [`Dockerfile`](Dockerfile) | Multi-stage build: Go 1.26 (Alpine) builder → static binary on `ubi10/ubi-micro`, plus the CA bundle from `ubi10/ubi-minimal`. Runs as non-root. |
-| [`Makefile`](Makefile) | `test`, `test-conformance`, `build`, `rendered-manifest.yaml`, `deploy`. |
-| [`.github/workflows/push-docker-image.yaml`](.github/workflows/push-docker-image.yaml) | On a GitHub release, builds an amd64+arm64 image and pushes it to `quay.io/nr3v0/cert-manager-webhook-porkbun`. |
+| [`Dockerfile`](Dockerfile) | Multi-stage build: Go 1.27 (Alpine) builder → static binary on `ubi10/ubi-micro`, plus the CA bundle from `ubi10/ubi-minimal`. Runs as non-root. |
+| [`Makefile`](Makefile) | `test`, `test-conformance`, `build`, `push`, `rendered-manifest.yaml`, `deploy`. |
 | [`testdata/porkbun/`](testdata/porkbun/) | Sample solver config and Secret for the conformance suite. |
 | [`main_test.go`](main_test.go), [`solver_test.go`](solver_test.go), [`porkbun/porkbun_test.go`](porkbun/porkbun_test.go) | The conformance suite (build tag `conformance`) and offline unit tests. |
-| [`example/`](example/) | The untouched solver example from the upstream cert-manager template, kept for reference. It is not part of the webhook binary. |
+| [`example/`](example/) | The in-memory DNS solver example from the upstream cert-manager template, kept for reference (its startup race is fixed). It is not part of the webhook binary. |
 
 ## How it fits together
 
@@ -84,8 +83,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    dev["git tag + GitHub release"] --> gha["GitHub Actions<br/>push-docker-image.yaml"]
-    gha -- "buildx amd64+arm64<br/>Dockerfile (UBI 10 micro)" --> quay[("quay.io/nr3v0/<br/>cert-manager-webhook-porkbun")]
+    dev["make push IMAGE_TAG=x.y.z<br/>(or Quay build trigger)"] -- "podman build amd64+arm64<br/>Dockerfile (UBI 10 micro)" --> quay[("quay.io/nr3v0/<br/>cert-manager-webhook-porkbun")]
     repo["deploy/kustomize<br/>base + components + overlays/openshift"] --> apply{"oc apply -k<br/>or Argo CD"}
     quay -- "image pulled by" --> apply
     apply --> cluster["cluster<br/>(namespace cert-manager)"]
@@ -179,23 +177,23 @@ make build                       # podman (or docker) build -t quay.io/nr3v0/cer
 make build IMAGE_TAG=1.1.0
 ```
 
-Releases are built by GitHub Actions. Publishing a GitHub release runs
-`.github/workflows/push-docker-image.yaml`, which needs two repository secrets from a
-[Quay robot account](https://docs.quay.io/glossary/robot-accounts.html) with write access to the repository:
+Publish a multi-arch (amd64 + arm64) release from your workstation with podman:
 
-| Secret | Value |
-| --- | --- |
-| `QUAY_USERNAME` | robot name, e.g. `nr3v0+github_actions` |
-| `QUAY_ROBOT_TOKEN` | robot token |
+```bash
+podman login quay.io
+make push IMAGE_TAG=1.1.0        # builds a manifest list and pushes it to quay.io/nr3v0/cert-manager-webhook-porkbun:1.1.0
+```
 
-*Alternative:* skip Actions and set up a [Quay build trigger](https://docs.quay.io/guides/building.html)
-on this GitHub repository (Quay adds a webhook/deploy key and builds the `Dockerfile` on push or tag).
-Note that Quay builders build a single architecture.
+Cross-building arm64 on an amd64 host needs `qemu-user-static` installed.
+
+*Alternative:* set up a [Quay build trigger](https://docs.quay.io/guides/building.html) on this
+GitHub repository. Quay adds a webhook and deploy key, then builds the `Dockerfile` on every push or tag.
+Quay builders produce a single architecture.
 
 ## Running the tests
 
 ```bash
-make test                        # offline unit tests (Porkbun client + solver), no credentials needed
+make test                        # offline unit tests (Porkbun client, solver, example), no credentials needed
 ```
 
 All DNS01 webhooks **must** pass cert-manager's conformance suite. It runs against the real
@@ -210,7 +208,7 @@ TEST_ZONE_NAME=example.com. make test-conformance
 
 ## Credits
 
-- **[Talinx/cert-manager-webhook-porkbun](https://github.com/Talinx/cert-manager-webhook-porkbun)**, by Christoph Raitzig, is the project this repository clones. It contributed the Helm chart (converted to Kustomize here), the release workflows and dependency updates.
+- **[Talinx/cert-manager-webhook-porkbun](https://github.com/Talinx/cert-manager-webhook-porkbun)**, by Christoph Raitzig, is the project this repository clones. It contributed the Helm chart (converted to Kustomize here), release automation and dependency updates.
 - **[bcspragu/cert-manager-webhook-porkbun](https://github.com/bcspragu/cert-manager-webhook-porkbun)**, by Brandon Sprague, wrote the original Porkbun client and solver.
 - **[cert-manager/webhook-example](https://github.com/cert-manager/webhook-example)**, by the cert-manager Authors, is the template and test harness.
 - **[baarde/cert-manager-webhook-ovh](https://github.com/baarde/cert-manager-webhook-ovh)** was an inspiration for the original.

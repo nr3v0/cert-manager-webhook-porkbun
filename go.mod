@@ -1,8 +1,8 @@
 module github.com/nr3v0/cert-manager-webhook-porkbun
 
-go 1.26.0
+go 1.27.0
 
-toolchain go1.26.11
+toolchain go1.27.4
 
 require (
 	github.com/cert-manager/cert-manager v1.21.3

@@ -23,5 +23,6 @@ repository's git history.
 
 All of the above are licensed under the Apache License, Version 2.0; see
 LICENSE. Modifications in this repository (Kustomize deployment replacing the
-Helm chart, UBI 10 base image, security and error-handling changes) are
-likewise licensed under the Apache License, Version 2.0.
+Helm chart, UBI 10 base image, GitHub workflows removed, security and
+error-handling changes) are likewise licensed under the Apache License,
+Version 2.0.
