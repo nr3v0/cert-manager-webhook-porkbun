@@ -2,22 +2,33 @@ GO ?= $(shell which go)
 OS ?= $(shell $(GO) env GOOS)
 ARCH ?= $(shell $(GO) env GOARCH)
 
-IMAGE_NAME := "webhook"
-IMAGE_TAG := "latest"
+IMAGE_NAME ?= quay.io/nr3v0/cert-manager-webhook-porkbun
+IMAGE_TAG ?= latest
+CONTAINER_TOOL ?= $(shell command -v podman 2>/dev/null || command -v docker)
+KUSTOMIZE_BUILD ?= $(shell command -v kustomize >/dev/null 2>&1 && echo "kustomize build" || echo "kubectl kustomize")
+OVERLAY ?= deploy/kustomize/overlays/openshift
 
 OUT := $(shell pwd)/_out
 
 # FIXME: Required to set the environment variables below. Remove when fixed.
 ENVTEST_K8S_VERSION=1.35.0
 
-HELM_FILES := $(shell find charts/cert-manager-webhook-porkbun)
+KUSTOMIZE_FILES := $(shell find deploy/kustomize -type f)
 
+# Unit tests: no cluster, network or credentials needed.
+.PHONY: test
+test:
+	$(GO) test -v ./porkbun/ .
+
+# cert-manager DNS01 conformance suite against the real Porkbun API.
+# Needs TEST_ZONE_NAME and testdata/porkbun/{config.json,porkbun-credentials.yaml}.
 # FIXME: The environment variables are required by the test helper in cert-manager, but not required to run the tests.
-test: setup-envtest
+.PHONY: test-conformance
+test-conformance: setup-envtest
 	TEST_ASSET_ETCD=$(LOCALBIN)/k8s/$(ENVTEST_K8S_VERSION)-$(OS)-$(ARCH)/etcd \
 	TEST_ASSET_KUBE_APISERVER=$(LOCALBIN)/k8s/$(ENVTEST_K8S_VERSION)-$(OS)-$(ARCH)/kube-apiserver \
 	TEST_ASSET_KUBECTL=$(LOCALBIN)/k8s/$(ENVTEST_K8S_VERSION)-$(OS)-$(ARCH)/kubectl \
-	$(GO) test -v .
+	$(GO) test -v -tags conformance -run TestRunsSuite .
 
 .PHONY: clean
 clean:
@@ -26,17 +37,21 @@ clean:
 
 .PHONY: build
 build:
-	docker build -t "$(IMAGE_NAME):$(IMAGE_TAG)" .
+	$(CONTAINER_TOOL) build -t "$(IMAGE_NAME):$(IMAGE_TAG)" .
+
+$(OUT):
+	mkdir -p "$(OUT)"
 
 .PHONY: rendered-manifest.yaml
 rendered-manifest.yaml: $(OUT)/rendered-manifest.yaml
 
-$(OUT)/rendered-manifest.yaml: $(HELM_FILES) | $(OUT)
-	helm template \
-	    cert-manager-webhook-porkbun \
-            --set image.repository=$(IMAGE_NAME) \
-            --set image.tag=$(IMAGE_TAG) \
-            charts/cert-manager-webhook-porkbun > $@
+$(OUT)/rendered-manifest.yaml: $(KUSTOMIZE_FILES) | $(OUT)
+	$(KUSTOMIZE_BUILD) $(OVERLAY) > $@
+
+# Applies the overlay to the current cluster context.
+.PHONY: deploy
+deploy:
+	oc apply -k $(OVERLAY)
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin

@@ -1,0 +1,47 @@
+# Self-signed Issuer used only to bootstrap the webhook's own CA.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cert-manager-webhook-porkbun-selfsign
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+# CA used to sign the webhook serving certificate.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-manager-webhook-porkbun-ca
+  namespace: cert-manager
+spec:
+  secretName: cert-manager-webhook-porkbun-ca
+  duration: 43800h # 5y
+  issuerRef:
+    name: cert-manager-webhook-porkbun-selfsign
+  commonName: ca.porkbun.cert-manager
+  isCA: true
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cert-manager-webhook-porkbun-ca
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: cert-manager-webhook-porkbun-ca
+---
+# Serving certificate for the webhook; its CA is injected into the APIService.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-manager-webhook-porkbun-webhook-tls
+  namespace: cert-manager
+spec:
+  secretName: cert-manager-webhook-porkbun-webhook-tls
+  duration: 8760h # 1y
+  issuerRef:
+    name: cert-manager-webhook-porkbun-ca
+  dnsNames:
+    - cert-manager-webhook-porkbun
+    - cert-manager-webhook-porkbun.cert-manager
+    - cert-manager-webhook-porkbun.cert-manager.svc

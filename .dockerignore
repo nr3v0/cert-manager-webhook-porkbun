@@ -1,0 +1,12 @@
+# Keep the build context to what the Go build needs; never send history,
+# local credentials or build output to the container builder.
+.git
+.github
+.zsh_history
+*.md
+_out
+_test
+bin
+deploy
+example
+testdata

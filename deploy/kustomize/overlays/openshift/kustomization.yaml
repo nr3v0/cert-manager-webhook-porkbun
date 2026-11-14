@@ -1,0 +1,26 @@
+# OpenShift overlay. The base already runs under the restricted-v2 SCC
+# (non-root, arbitrary UID, no capabilities, port 8443).
+#
+# Deploy with:  oc apply -k deploy/kustomize/overlays/openshift
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Required: fills in the GROUP_NAME placeholders. Keep this in every overlay.
+components:
+  - ../../components/group-name
+
+images:
+  - name: quay.io/nr3v0/cert-manager-webhook-porkbun
+    newTag: "1.1.0"
+
+# To use a different API group, uncomment and edit. It must match the
+# `groupName` in your ACME Issuer's webhook solver.
+# configMapGenerator:
+#   - name: cert-manager-webhook-porkbun-config
+#     namespace: cert-manager
+#     behavior: replace
+#     literals:
+#       - groupName=porkbun.example.com

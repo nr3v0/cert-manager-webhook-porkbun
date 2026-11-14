@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cert-manager-webhook-porkbun
+  namespace: cert-manager
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: cert-manager-webhook-porkbun
+    app.kubernetes.io/component: webhook
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+      protocol: TCP

@@ -1,0 +1,15 @@
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  # v1alpha1.<groupName>; the suffix is replaced by kustomization.yaml `replacements`
+  name: v1alpha1.GROUP_NAME
+  annotations:
+    cert-manager.io/inject-ca-from: cert-manager/cert-manager-webhook-porkbun-webhook-tls
+spec:
+  group: GROUP_NAME # replaced by kustomization.yaml `replacements`
+  groupPriorityMinimum: 1000
+  versionPriority: 15
+  version: v1alpha1
+  service:
+    name: cert-manager-webhook-porkbun
+    namespace: cert-manager
