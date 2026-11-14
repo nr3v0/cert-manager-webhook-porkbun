@@ -1,36 +1,28 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	acmetest "github.com/cert-manager/cert-manager/test/acme"
-
-	"github.com/cert-manager/webhook-example/example"
 )
 
+// TestRunsSuite runs the cert-manager DNS01 conformance suite against the real
+// Porkbun API. It needs a zone you control and credentials, so it is skipped
+// unless TEST_ZONE_NAME is set (e.g. TEST_ZONE_NAME=example.com.).
+//
+// Copy testdata/porkbun/*.sample to the same names without the .sample suffix
+// and fill in your credentials before running.
 func TestRunsSuite(t *testing.T) {
-	// The manifest path should contain a file named config.json that is a
-	// snippet of valid configuration that should be included on the
-	// ChallengeRequest passed as part of the test cases.
-	//
+	zone := os.Getenv("TEST_ZONE_NAME")
+	if zone == "" {
+		t.Skip("TEST_ZONE_NAME not set; skipping Porkbun conformance suite")
+	}
 
-	// Uncomment the below fixture when implementing your custom DNS provider
-	//fixture := acmetest.NewFixture(&customDNSProviderSolver{},
-	//	acmetest.SetResolvedZone(zone),
-	//	acmetest.SetAllowAmbientCredentials(false),
-	//	acmetest.SetManifestPath("testdata/my-custom-solver"),
-	//	acmetest.SetBinariesPath("_test/kubebuilder/bin"),
-	//)
-	solver := example.New("59351")
-	fixture := acmetest.NewFixture(solver,
-		acmetest.SetResolvedZone("example.com."),
-		acmetest.SetManifestPath("testdata/my-custom-solver"),
-		acmetest.SetDNSServer("127.0.0.1:59351"),
-		acmetest.SetUseAuthoritative(false),
+	fixture := acmetest.NewFixture(&porkbunDNSProviderSolver{},
+		acmetest.SetResolvedZone(zone),
+		acmetest.SetAllowAmbientCredentials(false),
+		acmetest.SetManifestPath("testdata/porkbun"),
 	)
-	//need to uncomment and  RunConformance delete runBasic and runExtended once https://github.com/cert-manager/cert-manager/pull/4835 is merged
-	//fixture.RunConformance(t)
-	fixture.RunBasic(t)
-	fixture.RunExtended(t)
-
+	fixture.RunConformance(t)
 }

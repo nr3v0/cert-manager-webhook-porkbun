@@ -2,46 +2,88 @@
   <img src="https://raw.githubusercontent.com/cert-manager/cert-manager/d53c0b9270f8cd90d908460d69502694e1838f5f/logo/logo-small.png" height="256" width="256" alt="cert-manager project logo" />
 </p>
 
-# ACME webhook example
+# Porkbun Webhook for cert-manager
 
-The ACME issuer type supports an optional 'webhook' solver, which can be used
-to implement custom DNS01 challenge solving logic.
+An implementation of the cert-manager [`webhook.Solver` interface](https://pkg.go.dev/github.com/cert-manager/cert-manager@v1.12.3/pkg/acme/webhook#Solver) for [Porkbun](https://porkbun.com/). This is based on [cert-manager/webhook-example](https://github.com/cert-manager/webhook-example), with inspiration from [baarde/cert-manager-webhook-ovh](https://github.com/baarde/cert-manager-webhook-ovh)
 
-This is useful if you need to use cert-manager with a DNS provider that is not
-officially supported in cert-manager core.
+Note: The test suite does work, but I straight up deleted `main_test.go` because the dependency on `github.com/cert-manager/cert-manager/test/acme` was giving me insane, impossible to resolve versioning conflicts. I'm sure these will be resolved by someone more knowledgeable updating the `go.mod` in the example webhook, at which point I'll add the tests back.
 
-## Why not in core?
+## Installation
 
-As the project & adoption has grown, there has been an influx of DNS provider
-pull requests to our core codebase. As this number has grown, the test matrix
-has become un-maintainable and so, it's not possible for us to certify that
-providers work to a sufficient level.
+### Install cert-manager
 
-By creating this 'interface' between cert-manager and DNS providers, we allow
-users to quickly iterate and test out new integrations, and then packaging
-those up themselves as 'extensions' to cert-manager.
+Install cert-manager using its [installation documentation](https://cert-manager.io/docs/installation/).
 
-We can also then provide a standardised 'testing framework', or set of
-conformance tests, which allow us to validate that a DNS provider works as
-expected.
+### Install webhook
 
-## Creating your own webhook
+Add helm repo:
 
-Webhook's themselves are deployed as Kubernetes API services, in order to allow
-administrators to restrict access to webhooks with Kubernetes RBAC.
+```bash
+helm repo add cert-manager-webhook-porkbun https://talinx.github.io/cert-manager-webhook-porkbun
+```
 
-This is important, as otherwise it'd be possible for anyone with access to your
-webhook to complete ACME challenge validations and obtain certificates.
+[Generate a porkbun API key](https://kb.porkbun.com/article/190-getting-started-with-the-porkbun-api) and create a secret with it:
 
-To make the set up of these webhook's easier, we provide a template repository
-that can be used to get started quickly.
+```yaml
+apiVersion: v1
+stringData:
+  PORKBUN_API_KEY: pk1_yourapikeyhere
+  PORKBUN_SECRET_API_KEY: sk1_yoursecretkeyhere
+kind: Secret
+metadata:
+  name: porkbun-secret
+  namespace: cert-manager
+type: Opaque
+```
 
-When implementing your webhook, you should set the `groupName` in the
-[values.yml](deploy/example-webhook/values.yaml) of your chart to a domain name that 
-you - as the webhook-author - own. It should not need to be adjusted by the users of
-your chart.
+Install helm chart in a namespace of your choice, e. g. `cert-manager`:
 
-### Creating your own repository
+```bash
+helm install cert-manager-webhook-porkbun cert-manager-webhook-porkbun/cert-manager-webhook-porkbun -n cert-manager
+```
+
+Add an issuer (change the email address; the `groupName` has to match the `groupName` value of the helm chart), e. g.:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-issuer
+spec:
+  acme:
+    email: youremailhere@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-porkbun-tls
+    solvers:
+    - dns01:
+        webhook:
+          groupName: porkbun.talinx.dev
+          solverName: porkbun
+          config:
+            apiKey:
+              key: PORKBUN_API_KEY
+              name: porkbun-secret
+            secretApiKey:
+              key: PORKBUN_SECRET_API_KEY
+              name: porkbun-secret
+```
+
+Add a certificate, e. g.:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: prod-cert
+spec:
+  secretName: prod-cert
+  issuerRef:
+    name: letsencrypt-issuer
+    kind: ClusterIssuer
+  dnsNames:
+  - 'mysub.example.com'
+```
 
 ### Running the test suite
 
@@ -51,7 +93,7 @@ else they will have undetermined behaviour when used with cert-manager.
 **It is essential that you configure and run the test suite when creating a
 DNS01 webhook.**
 
-An example Go test file has been provided in [main_test.go](https://github.com/cert-manager/webhook-example/blob/master/main_test.go).
+An example Go test file has been provided in [main_test.go](https://github.com/bcspragu/cert-manager-webhook-porkbun/blob/master/main_test.go).
 
 You can run the test suite with:
 
