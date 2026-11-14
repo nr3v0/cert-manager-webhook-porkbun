@@ -1,3 +1,5 @@
+//go:build conformance
+
 package main
 
 import (
@@ -8,8 +10,10 @@ import (
 )
 
 // TestRunsSuite runs the cert-manager DNS01 conformance suite against the real
-// Porkbun API. It needs a zone you control and credentials, so it is skipped
-// unless TEST_ZONE_NAME is set (e.g. TEST_ZONE_NAME=example.com.).
+// Porkbun API. It is behind the "conformance" build tag because the
+// cert-manager test harness needs envtest binaries; run it with
+// `TEST_ZONE_NAME=example.com. make test-conformance`. It needs a zone you
+// control and credentials, and is skipped unless TEST_ZONE_NAME is set.
 //
 // Copy testdata/porkbun/*.sample to the same names without the .sample suffix
 // and fill in your credentials before running.
