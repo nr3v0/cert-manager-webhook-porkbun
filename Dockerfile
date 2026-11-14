@@ -3,6 +3,8 @@
 
 # All stages are Red Hat UBI 10.
 #
+# No image is digest-pinned: rebuilds pick up the latest UBI 10 base images.
+#
 # Builder: UBI 10 Go Toolset, tracking the latest 1.27.x (floating tag, not
 # digest-pinned, so rebuilds pick up Go patch releases). It runs on the build
 # host's platform and cross-compiles, so multi-arch builds
@@ -32,10 +34,10 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 
 # ubi-micro ships no CA bundle, so take Red Hat's trust store from ubi-minimal
 # (arch-independent, hence the build platform).
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi-minimal:10.3@sha256:fb2f7f857cc60d88e3fad19da505083a682ca4569d7b55a61f64aaa43641f741 AS ca
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi-minimal:latest AS ca
 
 # UBI 10 micro: minimal Red Hat base with no package manager.
-FROM registry.access.redhat.com/ubi10/ubi-micro:10.3@sha256:2ad0f98cb13160c4773c945ef93f88b25831c7f27cd3780d72a7e78b210ea72b
+FROM registry.access.redhat.com/ubi10/ubi-micro:latest
 
 LABEL org.opencontainers.image.title="cert-manager-webhook-porkbun" \
       org.opencontainers.image.description="cert-manager ACME DNS01 webhook for Porkbun. Clone of github.com/Talinx/cert-manager-webhook-porkbun (originally by Brandon Sprague)." \
