@@ -28,7 +28,7 @@ challenges (needed, for example, for wildcard certificates) for domains hosted a
 | [`deploy/kustomize/base/`](deploy/kustomize/base/) | Plain Kubernetes manifests: ServiceAccount, RBAC, cert-manager PKI (self-signed CA and serving cert), Service, Deployment, APIService, and the `groupName` ConfigMap. |
 | [`deploy/kustomize/components/group-name/`](deploy/kustomize/components/group-name/) | A Kustomize component that copies `groupName` from the ConfigMap into the Deployment, APIService and RBAC. |
 | [`deploy/kustomize/overlays/openshift/`](deploy/kustomize/overlays/openshift/) | The overlay you deploy. It pins the image tag and is where you override `groupName`. |
-| [`Dockerfile`](Dockerfile) | Multi-stage build: Go 1.27 (Alpine) builder → static binary on `ubi10/ubi-micro`, plus the CA bundle from `ubi10/ubi-minimal`. Runs as non-root. |
+| [`Dockerfile`](Dockerfile) | All-UBI 10 multi-stage build: `ubi10/go-toolset:1.27` builder → static binary on `ubi10/ubi-micro`, plus the CA bundle from `ubi10/ubi-minimal`. Runs as non-root. |
 | [`Makefile`](Makefile) | `test`, `test-conformance`, `build`, `push`, `rendered-manifest.yaml`, `deploy`. |
 | [`testdata/porkbun/`](testdata/porkbun/) | Sample solver config and Secret for the conformance suite. |
 | [`main_test.go`](main_test.go), [`solver_test.go`](solver_test.go), [`porkbun/porkbun_test.go`](porkbun/porkbun_test.go) | The conformance suite (build tag `conformance`) and offline unit tests. |
