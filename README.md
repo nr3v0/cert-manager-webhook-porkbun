@@ -220,6 +220,17 @@ One-time setup on the cluster:
    - **GitHub App** (recommended, cluster-wide): `tkn pac bootstrap`, then install the app on this repository.
    - **Repository webhook:** `tkn pac webhook add -n porkbun-ci cert-manager-webhook-porkbun`.
      It needs a GitHub token that can manage webhooks, and the cluster's Pipelines-as-Code route must be reachable from GitHub.
+   - **Cluster not reachable from the internet** (for example, a lab cluster on a private network): run the
+     [gosmee](https://github.com/chmouel/gosmee) relay from [`deploy/pipelines/gosmee.yaml`](deploy/pipelines/gosmee.yaml).
+     It connects outbound to `hook.pipelinesascode.com` and forwards events to the in-cluster controller. Then set the GitHub
+     webhook's *Payload URL* to the channel URL (Settings → Webhooks → Edit), keeping the same secret:
+     ```bash
+     URL=$(curl -s https://hook.pipelinesascode.com/new)
+     oc create secret generic gosmee-channel -n porkbun-ci --from-literal=url="$URL"
+     oc apply -f deploy/pipelines/gosmee.yaml
+     echo "$URL"   # paste into the GitHub webhook Payload URL
+     ```
+     Events stay HMAC-signed with the webhook secret, so Pipelines-as-Code rejects anything forged through the relay.
 5. **Push to `dev` or `main`.** Watch the run with `tkn pac logs -n porkbun-ci -L` or in the console under Pipelines.
 
 ## Running the tests

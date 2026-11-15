@@ -1,0 +1,56 @@
+# Webhook relay for clusters that GitHub can't reach (e.g. snok on 192.168.x).
+# gosmee opens an outbound connection to the relay channel and forwards each
+# GitHub event to the Pipelines-as-Code controller's in-cluster Service.
+# Events stay signed with the Repository's webhook secret, which PaC verifies,
+# so forged events are rejected.
+#
+# The channel URL is kept out of git (this repo is public). Create it once:
+#   curl -s https://hook.pipelinesascode.com/new      # prints the channel URL
+#   oc create secret generic gosmee-channel -n porkbun-ci --from-literal=url=<channel URL>
+# and set the GitHub repository webhook's Payload URL to the same channel URL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gosmee-client
+  namespace: porkbun-ci
+  labels:
+    app.kubernetes.io/name: gosmee-client
+    app.kubernetes.io/part-of: cert-manager-webhook-porkbun-ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gosmee-client
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gosmee-client
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gosmee
+          image: ghcr.io/chmouel/gosmee:v0.32.1
+          args:
+            - client
+            - $(SMEE_URL)
+            - http://pipelines-as-code-controller.openshift-pipelines.svc.cluster.local:8080
+          env:
+            - name: SMEE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gosmee-channel
+                  key: url
+          resources:
+            requests:
+              cpu: 5m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
