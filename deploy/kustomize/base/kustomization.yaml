@@ -27,7 +27,7 @@ labels:
 images:
   - name: cert-manager-webhook-porkbun
     newName: quay.io/nr3v0/cert-manager-webhook-porkbun
-    newTag: "1.1.0"
+    newTag: "1.2.0"
 
 # The webhook's API group. It must be a domain you own and must match
 # `groupName` in your ACME Issuer. The manifests contain a GROUP_NAME

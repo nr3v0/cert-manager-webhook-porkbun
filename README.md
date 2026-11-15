@@ -177,14 +177,14 @@ spec:
 
 ```bash
 make build                       # podman (or docker) build -t quay.io/nr3v0/cert-manager-webhook-porkbun:latest .
-make build IMAGE_TAG=1.1.0
+make build IMAGE_TAG=1.2.0
 ```
 
 Publish a multi-arch (amd64 + arm64) release from your workstation with podman:
 
 ```bash
 podman login quay.io
-make push IMAGE_TAG=1.1.0        # builds a manifest list and pushes it to quay.io/nr3v0/cert-manager-webhook-porkbun:1.1.0
+make push IMAGE_TAG=1.2.0        # builds a manifest list and pushes it to quay.io/nr3v0/cert-manager-webhook-porkbun:1.2.0
 ```
 
 Cross-building arm64 on an amd64 host needs `qemu-user-static` installed.
@@ -232,6 +232,8 @@ One-time setup on the cluster:
      ```
      Events stay HMAC-signed with the webhook secret, so Pipelines-as-Code rejects anything forged through the relay.
 5. **Push to `dev` or `main`.** Watch the run with `tkn pac logs -n porkbun-ci -L` or in the console under Pipelines.
+
+The full runbook (setup, release steps and the fixes for problems hit along the way) is in [`docs/BUILDING.md`](docs/BUILDING.md).
 
 ## Running the tests
 

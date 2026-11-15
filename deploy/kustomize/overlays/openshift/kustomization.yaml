@@ -14,7 +14,7 @@ components:
 
 images:
   - name: quay.io/nr3v0/cert-manager-webhook-porkbun
-    newTag: "1.1.0"
+    newTag: "1.2.0"
 
 # To use a different API group, uncomment and edit. It must match the
 # `groupName` in your ACME Issuer's webhook solver.
