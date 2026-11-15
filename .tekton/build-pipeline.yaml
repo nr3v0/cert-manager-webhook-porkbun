@@ -118,11 +118,17 @@ spec:
               tags=("$tag" "sha-${rev:0:7}")
 
               local_ref="localhost/cert-manager-webhook-porkbun:${rev}"
-              buildah build \
-                --platform linux/amd64,linux/arm64 \
-                --manifest "$local_ref" \
-                --label "org.opencontainers.image.revision=${rev}" \
-                .
+              # One platform per invocation: a multi-value --platform makes
+              # buildah overlay-mount the build context per platform, which
+              # needs fuse-overlayfs and /dev/fuse (not available in the pod).
+              for platform in linux/amd64 linux/arm64; do
+                echo "Building ${platform}"
+                buildah build \
+                  --platform "$platform" \
+                  --manifest "$local_ref" \
+                  --label "org.opencontainers.image.revision=${rev}" \
+                  .
+              done
 
               for t in "${tags[@]}"; do
                 echo "Pushing ${image}:${t}"
