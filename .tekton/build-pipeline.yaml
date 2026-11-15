@@ -53,6 +53,12 @@ spec:
         - name: quay-auth
           workspace: quay-auth
       taskSpec:
+        metadata:
+          annotations:
+            # buildah always overlay-mounts the build context; without
+            # CAP_SYS_ADMIN it uses fuse-overlayfs, which needs /dev/fuse.
+            # CRI-O exposes the device to this (unprivileged) pod.
+            io.kubernetes.cri-o.Devices: /dev/fuse
         params:
           - name: image
           - name: revision
@@ -118,9 +124,7 @@ spec:
               tags=("$tag" "sha-${rev:0:7}")
 
               local_ref="localhost/cert-manager-webhook-porkbun:${rev}"
-              # One platform per invocation: a multi-value --platform makes
-              # buildah overlay-mount the build context per platform, which
-              # needs fuse-overlayfs and /dev/fuse (not available in the pod).
+              # One platform per invocation keeps each build (and its log) separate.
               for platform in linux/amd64 linux/arm64; do
                 echo "Building ${platform}"
                 buildah build \
