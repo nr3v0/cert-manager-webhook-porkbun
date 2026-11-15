@@ -8,6 +8,7 @@ import (
 	acme "github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExampleSolver_Name(t *testing.T) {
@@ -23,7 +24,7 @@ func TestExampleSolver_Initialize(t *testing.T) {
 	solver := New(port.String())
 	done := make(chan struct{})
 	err := solver.Initialize(nil, done)
-	assert.NoError(t, err, "Expected Initialize not to error")
+	require.NoError(t, err, "Expected Initialize not to error")
 	close(done)
 }
 
@@ -33,7 +34,7 @@ func TestExampleSolver_Present_Cleanup(t *testing.T) {
 	solver := New(port.String())
 	done := make(chan struct{})
 	err := solver.Initialize(nil, done)
-	assert.NoError(t, err, "Expected Initialize not to error")
+	require.NoError(t, err, "Expected Initialize not to error")
 
 	validTestData := []struct {
 		hostname string
@@ -50,7 +51,7 @@ func TestExampleSolver_Present_Cleanup(t *testing.T) {
 			ResolvedFQDN: test.hostname,
 			Key:          test.record,
 		})
-		assert.NoError(t, err, "Unexpected error while presenting %v", t)
+		assert.NoError(t, err, "Unexpected error while presenting %s", test.hostname)
 	}
 
 	// Resolve test data
@@ -62,8 +63,8 @@ func TestExampleSolver_Present_Cleanup(t *testing.T) {
 		msg.Question[0] = dns.Question{Name: dns.Fqdn(test.hostname), Qtype: dns.TypeTXT, Qclass: dns.ClassINET}
 		in, err := dns.Exchange(msg, "127.0.0.1:"+port.String())
 
-		assert.NoError(t, err, "Presented record %s not resolvable", test.hostname)
-		assert.Len(t, in.Answer, 1, "RR response is of incorrect length")
+		require.NoError(t, err, "Presented record %s not resolvable", test.hostname)
+		require.Len(t, in.Answer, 1, "RR response is of incorrect length")
 		assert.Equal(t, []string{test.record}, in.Answer[0].(*dns.TXT).Txt, "TXT record returned did not match presented record")
 	}
 
@@ -75,7 +76,7 @@ func TestExampleSolver_Present_Cleanup(t *testing.T) {
 			ResolvedFQDN: test.hostname,
 			Key:          test.record,
 		})
-		assert.NoError(t, err, "Unexpected error while cleaning up %v", t)
+		assert.NoError(t, err, "Unexpected error while cleaning up %s", test.hostname)
 	}
 
 	// Resolve test data
@@ -87,9 +88,9 @@ func TestExampleSolver_Present_Cleanup(t *testing.T) {
 		msg.Question[0] = dns.Question{Name: dns.Fqdn(test.hostname), Qtype: dns.TypeTXT, Qclass: dns.ClassINET}
 		in, err := dns.Exchange(msg, "127.0.0.1:"+port.String())
 
-		assert.NoError(t, err, "Presented record %s not resolvable", test.hostname)
+		require.NoError(t, err, "Cleaned-up record %s query failed", test.hostname)
 		assert.Len(t, in.Answer, 0, "RR response is of incorrect length")
-		assert.Equal(t, dns.RcodeNameError, in.Rcode, "Expexted NXDOMAIN")
+		assert.Equal(t, dns.RcodeNameError, in.Rcode, "Expected NXDOMAIN")
 	}
 
 	close(done)

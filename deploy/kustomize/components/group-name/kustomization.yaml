@@ -1,0 +1,34 @@
+# Copies data.groupName from the cert-manager-webhook-porkbun-config ConfigMap
+# into every place the webhook's API group is needed. This is a component (not
+# part of the base) so it runs in the including overlay, after any override of
+# the ConfigMap there.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cert-manager-webhook-porkbun-config
+      fieldPath: data.groupName
+    targets:
+      - select:
+          kind: Deployment
+          name: cert-manager-webhook-porkbun
+        fieldPaths:
+          - spec.template.spec.containers.[name=webhook].env.[name=GROUP_NAME].value
+      - select:
+          kind: APIService
+        fieldPaths:
+          - spec.group
+      - select:
+          kind: APIService
+        fieldPaths:
+          - metadata.name
+        options:
+          delimiter: "v1alpha1."
+          index: 1
+      - select:
+          kind: ClusterRole
+          name: cert-manager-webhook-porkbun:domain-solver
+        fieldPaths:
+          - rules.0.apiGroups.0

@@ -13,9 +13,13 @@
 *.out
 
 # Ignore the built binary
-cert-manager-webhook-example
+/cert-manager-webhook-porkbun
+/webhook
 
 # Make artifacts
 bin
 _out
 _test
+
+/testdata/porkbun/config.json
+/testdata/porkbun/porkbun-credentials.yaml

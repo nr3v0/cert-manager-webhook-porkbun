@@ -4,7 +4,7 @@ package example
 
 import (
 	"fmt"
-	"os"
+	"log/slog"
 	"sync"
 
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook"
@@ -38,17 +38,32 @@ func (e *exampleSolver) CleanUp(ch *acme.ChallengeRequest) error {
 	return nil
 }
 
-func (e *exampleSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
-	go func(done <-chan struct{}) {
-		<-done
-		if err := e.server.Shutdown(); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-		}
-	}(stopCh)
+// Initialize starts the in-memory DNS server and only returns once it is
+// listening, so callers can query it immediately. It shuts the server down
+// when stopCh is closed.
+func (e *exampleSolver) Initialize(_ *rest.Config, stopCh <-chan struct{}) error {
+	started := make(chan struct{})
+	errCh := make(chan error, 1)
+	e.server.NotifyStartedFunc = func() { close(started) }
+
+	go func() { errCh <- e.server.ListenAndServe() }()
+
+	select {
+	case <-started:
+	case err := <-errCh:
+		return fmt.Errorf("example DNS server failed to start on %s: %w", e.server.Addr, err)
+	}
+
 	go func() {
-		if err := e.server.ListenAndServe(); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-			os.Exit(1)
+		select {
+		case <-stopCh:
+			if err := e.server.Shutdown(); err != nil {
+				slog.Error("failed to shut down example DNS server", "error", err)
+			}
+		case err := <-errCh:
+			if err != nil {
+				slog.Error("example DNS server stopped", "error", err)
+			}
 		}
 	}()
 	return nil

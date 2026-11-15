@@ -1,0 +1,28 @@
+cert-manager-webhook-porkbun
+https://github.com/nr3v0/cert-manager-webhook-porkbun
+
+This repository is a clone of Talinx/cert-manager-webhook-porkbun:
+  https://github.com/Talinx/cert-manager-webhook-porkbun
+  Copyright Christoph Raitzig (Talinx)
+  Helm chart, container/chart release workflows, Go/Alpine updates.
+
+which is in turn based on the original Porkbun webhook by Brandon Sprague:
+  https://github.com/bcspragu/cert-manager-webhook-porkbun
+  Copyright Brandon Sprague
+  Porkbun API client and DNS01 solver implementation.
+
+which was created from cert-manager's webhook template:
+  https://github.com/cert-manager/webhook-example
+  Copyright The cert-manager Authors
+
+with inspiration from baarde/cert-manager-webhook-ovh:
+  https://github.com/baarde/cert-manager-webhook-ovh
+
+The full commit history of the upstream projects is preserved in this
+repository's git history.
+
+All of the above are licensed under the Apache License, Version 2.0; see
+LICENSE. Modifications in this repository (Kustomize deployment replacing the
+Helm chart, UBI 10 base image, GitHub workflows removed, security and
+error-handling changes) are likewise licensed under the Apache License,
+Version 2.0.

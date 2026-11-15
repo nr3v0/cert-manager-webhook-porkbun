@@ -1,0 +1,43 @@
+# Kustomize base for cert-manager-webhook-porkbun.
+# Clone of https://github.com/Talinx/cert-manager-webhook-porkbun (Helm chart
+# converted to plain manifests).
+#
+# NOTE: do NOT set a top-level `namespace:` here or in an overlay. The
+# namespace transformer would also rewrite the RoleBinding that must live in
+# kube-system (extension-apiserver-authentication-reader), breaking the
+# webhook's authentication. Every namespaced object already sets its namespace
+# explicitly (cert-manager). To deploy elsewhere, patch the objects instead.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount.yaml
+  - rbac.yaml
+  - pki.yaml
+  - service.yaml
+  - deployment.yaml
+  - apiservice.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: cert-manager-webhook-porkbun
+      app.kubernetes.io/part-of: cert-manager
+    includeSelectors: false
+
+images:
+  - name: cert-manager-webhook-porkbun
+    newName: quay.io/nr3v0/cert-manager-webhook-porkbun
+    newTag: "1.2.0"
+
+# The webhook's API group. It must be a domain you own and must match
+# `groupName` in your ACME Issuer. The manifests contain a GROUP_NAME
+# placeholder; the ../components/group-name component copies this value into
+# the Deployment env, the APIService and the domain-solver ClusterRole.
+# Deploy an overlay (which includes that component), not this base directly.
+configMapGenerator:
+  - name: cert-manager-webhook-porkbun-config
+    namespace: cert-manager
+    literals:
+      - groupName=porkbun.openshift.works
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,85 @@
+# Lets the webhook read the ConfigMap holding the kube-apiserver's
+# requestheader CA (created automatically by the apiserver in kube-system).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-manager-webhook-porkbun:webhook-authentication-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-webhook-porkbun
+    namespace: cert-manager
+---
+# Delegates authn/authz decisions to the core apiserver.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-webhook-porkbun:auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-webhook-porkbun
+    namespace: cert-manager
+---
+# Lets cert-manager call this webhook's API group.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-webhook-porkbun:domain-solver
+rules:
+  - apiGroups:
+      - GROUP_NAME # replaced by kustomization.yaml `replacements`
+    resources:
+      - "*"
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-webhook-porkbun:domain-solver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-webhook-porkbun:domain-solver
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager
+---
+# Lets the webhook read the Porkbun API key Secrets referenced from an Issuer's
+# solver config. Only `get` is granted (upstream also granted watch/list on
+# every Secret in the cluster, which the webhook never uses).
+#
+# This is still cluster-wide because a namespaced Issuer may live in any
+# namespace. If you only use ClusterIssuers (Secrets in cert-manager), replace
+# this with a Role/RoleBinding in the cert-manager namespace, optionally with
+# `resourceNames: [porkbun-secret]`.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-webhook-porkbun:secret-reader
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-webhook-porkbun:secret-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-webhook-porkbun:secret-reader
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-webhook-porkbun
+    namespace: cert-manager
