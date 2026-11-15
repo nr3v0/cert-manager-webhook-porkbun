@@ -89,11 +89,13 @@ spec:
               - name: container-storage
                 mountPath: /var/lib/containers
             computeResources:
+              # go build -p=8 of the k8s/cert-manager dependency tree peaks at
+              # several GiB; 4Gi caused reclaim thrashing on the first runs.
               requests:
-                cpu: 500m
-                memory: 1Gi
+                cpu: "2"
+                memory: 2Gi
               limits:
-                memory: 4Gi
+                memory: 8Gi
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
@@ -127,8 +129,11 @@ spec:
               # One platform per invocation keeps each build (and its log) separate.
               for platform in linux/amd64 linux/arm64; do
                 echo "Building ${platform}"
+                # -p caps parallel compiles: Go defaults to one per node CPU,
+                # which on a large node exhausts the memory limit and thrashes.
                 buildah build \
                   --platform "$platform" \
+                  --build-arg GOFLAGS=-p=8 \
                   --manifest "$local_ref" \
                   --label "org.opencontainers.image.revision=${rev}" \
                   .

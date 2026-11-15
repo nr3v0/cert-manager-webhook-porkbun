@@ -26,6 +26,9 @@ FROM build_deps AS build
 
 ARG TARGETOS=linux
 ARG TARGETARCH
+# Optional extra go flags, e.g. --build-arg GOFLAGS=-p=8 to cap parallel
+# compiles on many-core builders with a memory limit. Empty = Go defaults.
+ARG GOFLAGS=""
 
 COPY --chown=1001:0 . .
 
