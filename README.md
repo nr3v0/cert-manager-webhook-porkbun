@@ -30,6 +30,7 @@ challenges (needed, for example, for wildcard certificates) for domains hosted a
 | [`deploy/kustomize/overlays/openshift/`](deploy/kustomize/overlays/openshift/) | The overlay you deploy. It pins the image tag and is where you override `groupName`. |
 | [`Dockerfile`](Dockerfile) | All-UBI 10 multi-stage build: `ubi10/go-toolset:latest` builder → static binary on `ubi10/ubi-micro`, plus the CA bundle from `ubi10/ubi-minimal`. Runs as non-root. |
 | [`Makefile`](Makefile) | `test`, `test-conformance`, `build`, `push`, `rendered-manifest.yaml`, `deploy`. |
+| [`.tekton/`](.tekton/), [`deploy/pipelines/`](deploy/pipelines/) | Pipelines-as-Code build: on push, OpenShift Pipelines builds the amd64+arm64 image and pushes it to Quay. |
 | [`testdata/porkbun/`](testdata/porkbun/) | Sample solver config and Secret for the conformance suite. |
 | [`main_test.go`](main_test.go), [`solver_test.go`](solver_test.go), [`porkbun/porkbun_test.go`](porkbun/porkbun_test.go) | The conformance suite (build tag `conformance`) and offline unit tests. |
 | [`example/`](example/) | The in-memory DNS solver example from the upstream cert-manager template, kept for reference (its startup race is fixed). It is not part of the webhook binary. |
@@ -83,7 +84,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    dev["make push IMAGE_TAG=x.y.z<br/>(or Quay build trigger)"] -- "podman build amd64+arm64<br/>Dockerfile (UBI 10 micro)" --> quay[("quay.io/nr3v0/<br/>cert-manager-webhook-porkbun")]
+    gh["git push / tag<br/>(GitHub)"] -- "webhook" --> pac["OpenShift Pipelines<br/>Pipelines-as-Code<br/>.tekton/"]
+    pac -- "buildah amd64+arm64<br/>Dockerfile (UBI 10)" --> quay
+    dev["make push IMAGE_TAG=x.y.z<br/>(manual)"] -- "podman amd64+arm64" --> quay[("quay.io/nr3v0/<br/>cert-manager-webhook-porkbun")]
     repo["deploy/kustomize<br/>base + components + overlays/openshift"] --> apply{"oc apply -k<br/>or Argo CD"}
     quay -- "image pulled by" --> apply
     apply --> cluster["cluster<br/>(namespace cert-manager)"]
@@ -186,9 +189,38 @@ make push IMAGE_TAG=1.1.0        # builds a manifest list and pushes it to quay.
 
 Cross-building arm64 on an amd64 host needs `qemu-user-static` installed.
 
-*Alternative:* set up a [Quay build trigger](https://docs.quay.io/guides/building.html) on this
-GitHub repository. Quay adds a webhook and deploy key, then builds the `Dockerfile` on every push or tag.
-Quay builders produce a single architecture.
+### Automated builds (OpenShift Pipelines)
+
+Pushes to GitHub trigger a [Pipelines-as-Code](https://pipelinesascode.com/) run on an OpenShift
+cluster. The run builds the amd64 and arm64 images with buildah and pushes a manifest list to Quay.
+(Quay.io's own build triggers produce only one architecture.)
+
+| Push | Image tags |
+| --- | --- |
+| `main` | `latest`, `sha-<commit>` |
+| `dev` | `dev`, `sha-<commit>` |
+| tag `v1.2.3` or `1.2.3` | `1.2.3`, `sha-<commit>` |
+
+The pipeline is defined in [`.tekton/build-pipeline.yaml`](.tekton/build-pipeline.yaml), and
+[`.tekton/push.yaml`](.tekton/push.yaml) says when it runs. It runs on an amd64 node. The Dockerfile
+cross-compiles, so no QEMU is needed for the arm64 image.
+
+One-time setup on the cluster:
+
+1. **Install the Red Hat OpenShift Pipelines operator.** It includes Pipelines-as-Code and the `tkn pac` CLI plugin.
+2. **Create a Quay robot account** with *Write* access to `quay.io/nr3v0/cert-manager-webhook-porkbun`.
+   In Quay, go to Account settings → Robot Accounts → Create, then grant it the repository.
+3. **Create the namespace and Repository, then the push secret.** The secret is not stored in git:
+   ```bash
+   oc apply -f deploy/pipelines/repository.yaml
+   oc create secret docker-registry quay-push -n porkbun-ci \
+     --docker-server=quay.io --docker-username='nr3v0+pipelines' --docker-password='<robot token>'
+   ```
+4. **Connect GitHub to the cluster.** Use one of:
+   - **GitHub App** (recommended, cluster-wide): `tkn pac bootstrap`, then install the app on this repository.
+   - **Repository webhook:** `tkn pac webhook add -n porkbun-ci cert-manager-webhook-porkbun`.
+     It needs a GitHub token that can manage webhooks, and the cluster's Pipelines-as-Code route must be reachable from GitHub.
+5. **Push to `dev` or `main`.** Watch the run with `tkn pac logs -n porkbun-ci -L` or in the console under Pipelines.
 
 ## Running the tests
 

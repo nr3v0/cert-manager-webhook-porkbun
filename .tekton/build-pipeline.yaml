@@ -1,0 +1,130 @@
+# Multi-arch (amd64 + arm64) image build for Pipelines-as-Code.
+# Referenced by name from .tekton/push.yaml.
+#
+# The Dockerfile cross-compiles in --platform=$BUILDPLATFORM stages and the
+# arm64 runtime stage only COPYs, so no QEMU/binfmt is needed on the node; the
+# run is pinned to amd64 nodes in push.yaml.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: cert-manager-webhook-porkbun-build
+spec:
+  params:
+    - name: repo_url
+      type: string
+    - name: revision
+      type: string
+      description: Commit SHA to build.
+    - name: git_ref
+      type: string
+      description: Branch name or refs/tags/<tag> that was pushed.
+    - name: image
+      type: string
+      default: quay.io/nr3v0/cert-manager-webhook-porkbun
+  workspaces:
+    - name: source
+    - name: quay-auth
+      description: Secret of type kubernetes.io/dockerconfigjson with push access to the image repo.
+  tasks:
+    - name: fetch-source
+      taskRef:
+        name: git-clone # resolved by Pipelines-as-Code (see push.yaml annotations)
+      params:
+        - name: url
+          value: $(params.repo_url)
+        - name: revision
+          value: $(params.revision)
+      workspaces:
+        - name: output
+          workspace: source
+
+    - name: build-push
+      runAfter: [fetch-source]
+      params:
+        - name: image
+          value: $(params.image)
+        - name: revision
+          value: $(params.revision)
+        - name: git_ref
+          value: $(params.git_ref)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: quay-auth
+          workspace: quay-auth
+      taskSpec:
+        params:
+          - name: image
+          - name: revision
+          - name: git_ref
+        workspaces:
+          - name: source
+          - name: quay-auth
+            readOnly: true
+        volumes:
+          - name: container-storage
+            emptyDir: {}
+        steps:
+          - name: build-and-push
+            image: registry.access.redhat.com/ubi10/buildah:latest
+            workingDir: $(workspaces.source.path)
+            env:
+              - name: STORAGE_DRIVER
+                value: vfs
+              - name: BUILDAH_ISOLATION
+                value: chroot
+              - name: REGISTRY_AUTH_FILE
+                value: $(workspaces.quay-auth.path)/.dockerconfigjson
+            securityContext:
+              # Same as the OpenShift Pipelines buildah task (pipelines-scc).
+              capabilities:
+                add: ["SETFCAP"]
+            volumeMounts:
+              - name: container-storage
+                mountPath: /var/lib/containers
+            computeResources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                memory: 4Gi
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              ref='$(params.git_ref)'
+              rev='$(params.revision)'
+              image='$(params.image)'
+
+              # Tag scheme:
+              #   push to main         -> latest
+              #   push to other branch -> <branch> (sanitised)
+              #   push of tag v1.2.3   -> 1.2.3
+              #   always               -> sha-<7 chars>
+              case "$ref" in
+                refs/tags/*)
+                  tag="${ref#refs/tags/}"
+                  tag="${tag#v}"
+                  ;;
+                *)
+                  branch="${ref#refs/heads/}"
+                  if [ "$branch" = "main" ]; then
+                    tag=latest
+                  else
+                    tag="$(printf '%s' "$branch" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-120)"
+                  fi
+                  ;;
+              esac
+              tags=("$tag" "sha-${rev:0:7}")
+
+              local_ref="localhost/cert-manager-webhook-porkbun:${rev}"
+              buildah build \
+                --platform linux/amd64,linux/arm64 \
+                --manifest "$local_ref" \
+                --label "org.opencontainers.image.revision=${rev}" \
+                .
+
+              for t in "${tags[@]}"; do
+                echo "Pushing ${image}:${t}"
+                buildah manifest push --all "$local_ref" "docker://${image}:${t}"
+              done

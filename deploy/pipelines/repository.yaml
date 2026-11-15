@@ -1,0 +1,15 @@
+# One-time setup for the Pipelines-as-Code build (see README "Automated builds").
+# Apply with: oc apply -f deploy/pipelines/repository.yaml
+# Then create the quay-push Secret in the same namespace (not stored in git).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: porkbun-ci
+---
+apiVersion: pipelinesascode.tekton.dev/v1alpha1
+kind: Repository
+metadata:
+  name: cert-manager-webhook-porkbun
+  namespace: porkbun-ci
+spec:
+  url: https://github.com/nr3v0/cert-manager-webhook-porkbun
